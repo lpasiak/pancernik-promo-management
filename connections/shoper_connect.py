@@ -98,32 +98,44 @@ class ShoperAPIClient:
             print(f'Error fetching product {product_code}: {str(e)}')
             return None
 
-    def get_all_special_offers(self):
-        """Fetches all special offers and saves it to Excel file."""
-        products = []
-        page = 1
-        url = f'{self.site_url}/webapi/rest/specialoffers'
+    def get_all_products_and_select_special_offers(self):
+        """Fetches all special offers and returns filtered DataFrame."""
+        all_products = self.get_all_products()
 
-        print("Downloading all products.")
-        while True: 
-            params = {'limit': SHOPER_LIMIT, 'page': page}
-            response = self._handle_request('GET', url, params=params)
-            data = response.json()
+        df = pd.DataFrame(all_products)
+        
+        df['product_name'] = df['translations'].apply(lambda x: x.get('pl_PL', {}).get('name', ''))
+        df['price'] = df['stock'].apply(lambda x: x.get('price', '') if isinstance(x, dict) else '')
+        df['date_from'] = df['special_offer'].apply(
+            lambda x: pd.to_datetime(x.get('date_from', '')).strftime('%d-%m-%Y') 
+            if isinstance(x, dict) and x.get('date_from') 
+            else '')
+        
+        df['date_to'] = df['special_offer'].apply(
+            lambda x: pd.to_datetime(x.get('date_to', '')).strftime('%d-%m-%Y') 
+            if isinstance(x, dict) and x.get('date_to') 
+            else '')
 
-            number_of_pages = data['pages']
+        # Filter rows where promo_price is not None
+        df = df[df['promo_price'].notna()]
+        
 
-            if response.status_code != 200:
-                raise Exception(f"Failed to fetch data: {response.status_code}, {response.text}")
-
-            page_data = response.json().get('list', [])
-
-            if not page_data:  # If no data is returned
-                break
-
-            print(f'Page: {page}/{number_of_pages}')
-            products.extend(page_data)
-            page += 1
-
-        df = pd.DataFrame(products)
+        # Select only needed columns
+        columns_to_keep = [
+            'code',
+            'product_id',
+            'product_name',
+            'price',
+            'promo_price',
+            'date_from',
+            'date_to'
+        ]
+            
+        df = df[columns_to_keep]
+        
+        # Save to Excel
         df.to_excel(os.path.join(self.sheets_dir, 'shoper_all_special_offers.xlsx'), index=False)
         return df
+    
+    def create_a_special_offer(self, product_id):
+        pass

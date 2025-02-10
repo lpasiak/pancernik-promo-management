@@ -27,9 +27,9 @@ def main():
     shoper_client.connect()
     export_gsheets_client.connect()
 
-    print(export_gsheets_client)
-    # df = pd.DataFrame(shoper_client.get_all_special_offers())
-    # export_gsheets_client.save_data(df)
+    df = pd.DataFrame(shoper_client.get_all_products_and_select_special_offers())
+    export_gsheets_client.save_data(df)
+
 
 if __name__ == "__main__":
     main()

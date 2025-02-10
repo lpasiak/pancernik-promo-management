@@ -21,14 +21,15 @@ class GSheetsClient:
         self.sheet_name = sheet_name
         self.gc = None
         self.sheet = None
+        self.worksheet = None
         self.sheets_dir = SHEETS_DIR
-
 
     def connect(self):
         """Authenticate with Google Sheets."""
         try:
             self.gc = gspread.service_account(filename=self.credentials_path)
             self.sheet = self.gc.open_by_key(self.sheet_id)
+            self.worksheet = self.sheet.worksheet(self.sheet_name)
             print("Google Authentication successful.")
         except Exception as e:
             print(f"Failed to connect to Google Sheets: {str(e)}")
@@ -54,8 +55,31 @@ class GSheetsClient:
         return df
     
     def save_data(self, df):
-        if not self.sheet:
-            raise Exception("Not connected to Google Sheets. Call connect() first.")
+        """
+        Save DataFrame to Google Sheets.
+        """
+        try:
+            # Convert DataFrame to string values where necessary
+            all_values = self.transform_data(df)
             
-        worksheet = self.sheet.worksheet(self.sheet_name)
-        worksheet.update([df.columns.values.tolist()] + df.values.tolist())
+            print('Cleaning the worksheet...')
+            # Clear existing content
+            self.worksheet.clear()
+            print('Updating the worksheet')
+            # Update with new values
+            self.worksheet.update(all_values)
+            print(f"Successfully updated worksheet: {self.sheet_name}")
+            
+        except Exception as e:
+            print(f"Error saving to Google Sheets: {str(e)}")
+            raise
+
+    def transform_data(self, df):
+        """
+        Transform DataFrame to match Google Sheets format.
+        """
+        df_string = df.astype(str)
+        header = df_string.columns.values.tolist()
+        data = df_string.values.tolist()
+        
+        return [header] + data
