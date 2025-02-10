@@ -1,7 +1,6 @@
 import pandas as pd
 import requests, time, os, json
 from pathlib import Path
-from . import shoper_data_transform
 import config
 
 class ShoperAPIClient:

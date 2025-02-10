@@ -3,6 +3,7 @@ import pandas as pd
 from datetime import datetime
 from pathlib import Path
 import os
+import config
 
 
 class GSheetsClient:
@@ -51,3 +52,4 @@ class GSheetsClient:
         print('Downloaded all the data from Google Sheets.')
         print("-----------------------------------")
         return df
+    
