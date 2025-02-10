@@ -1,7 +1,6 @@
 import pandas as pd
 import requests, time, os, json
-from pathlib import Path
-import config
+from config import SHEETS_DIR, SHOPER_LIMIT
 
 class ShoperAPIClient:
 
@@ -12,9 +11,7 @@ class ShoperAPIClient:
         self.password = password
         self.session = requests.Session()
         self.token = None
-
-        self.sheets_dir = Path('sheets')
-        self.sheets_dir.mkdir(exist_ok=True)
+        self.sheets_dir = SHEETS_DIR
 
     def connect(self):
         """Authenticate with the API"""
@@ -27,7 +24,6 @@ class ShoperAPIClient:
             self.token = response.json().get('access_token')
             self.session.headers.update({'Authorization': f'Bearer {self.token}'})
             print("Shoper Authentication successful.")
-            print("-----------------------------------")
         else:
             raise Exception(f"Authentication failed: {response.status_code}, {response.text}")
 
@@ -50,7 +46,7 @@ class ShoperAPIClient:
 
         print("Downloading all products.")
         while True: 
-            params = {'limit': config.SHOPER_LIMIT, 'page': page}
+            params = {'limit': SHOPER_LIMIT, 'page': page}
             response = self._handle_request('GET', url, params=params)
             data = response.json()
             number_of_pages = data['pages']
@@ -70,10 +66,17 @@ class ShoperAPIClient:
         df = pd.DataFrame(products)
         df.to_excel(os.path.join(self.sheets_dir, 'shoper_all_products.xlsx'), index=False)
         return df
+    
+    def get_a_single_product(self, product_id):
+        url = f'{self.site_url}/webapi/rest/products/{product_id}'
 
+        response = self._handle_request('GET', url)
+        product = response.json()
+
+        return product
+    
     def get_a_single_product_by_code(self, product_code):
         url = f'{self.site_url}/webapi/rest/products'
-        photo_url = f'{self.site_url}/webapi/rest/product-images'
 
         product_filter = {
             "filters": json.dumps({"stock.code": product_code})
@@ -88,19 +91,39 @@ class ShoperAPIClient:
                 return None
             
             product = product_list[0]
-            product_id = product['product_id']
-
-            photo_filter = {
-                "filters": json.dumps({"product_id": product_id}),
-                "limit": 50
-            }
-
-            photo_response = self._handle_request('GET', photo_url, params=photo_filter)
-            product_photos = photo_response.json()['list']
-            product['img'] = product_photos
 
             return product
         
         except Exception as e:
             print(f'Error fetching product {product_code}: {str(e)}')
             return None
+
+    def get_all_special_offers(self):
+        """Fetches all special offers and saves it to Excel file."""
+        products = []
+        page = 1
+        url = f'{self.site_url}/webapi/rest/specialoffers'
+
+        print("Downloading all products.")
+        while True: 
+            params = {'limit': SHOPER_LIMIT, 'page': page}
+            response = self._handle_request('GET', url, params=params)
+            data = response.json()
+
+            number_of_pages = data['pages']
+
+            if response.status_code != 200:
+                raise Exception(f"Failed to fetch data: {response.status_code}, {response.text}")
+
+            page_data = response.json().get('list', [])
+
+            if not page_data:  # If no data is returned
+                break
+
+            print(f'Page: {page}/{number_of_pages}')
+            products.extend(page_data)
+            page += 1
+
+        df = pd.DataFrame(products)
+        df.to_excel(os.path.join(self.sheets_dir, 'shoper_all_special_offers.xlsx'), index=False)
+        return df
