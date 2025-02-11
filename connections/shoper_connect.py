@@ -90,7 +90,7 @@ class ShoperAPIClient:
             product_list = response.json().get('list', [])
             
             if not product_list:
-                print(f'Product {product_code} doesn\'t exist')
+                print(f'X | Product {product_code} doesn\'t exist')
                 return None
             
             product = product_list[0]
@@ -111,16 +111,15 @@ class ShoperAPIClient:
                 try:
                     error_data = response.json()
                     error_message = error_data.get('error_description', 'Brak opisu błędu.')
-                    print(f"X | Failed to create special offer. API response: {error_message}")
+                    print(f"X | Failed to create a special offer special offer {special_offer['product_id']}. API response: {error_message}")
                 except json.JSONDecodeError:
-                    print(f"X | Failed to create special offer. Raw API Response: {response.text}")  
-                return None
+                    print(f"X | Failed to create a special offer {special_offer['product_id']}. Raw API Response: {response.text}")  
+                return response.text
             else:
-                print(f'Special offer created successfully: {response.json()}')
+                print(f'✓ Special offer for a product {special_offer['product_id']} created successfully.')
+                return {'response': f'✓ Special offer for a product {special_offer['product_id']} created successfully.'}
         except Exception as e:
             print(f'Error creating special offer: {str(e)}')
-        
-        # return response.json()
 
     def get_all_products_and_select_special_offers(self):
         """Fetches all special offers and returns filtered DataFrame."""
@@ -160,28 +159,39 @@ class ShoperAPIClient:
         df.to_excel(os.path.join(SHEETS_DIR, 'shoper_all_special_offers.xlsx'), index=False)
         return df
     
-    def create_a_special_offer_from_df(self, df):
+    def create_special_offers_from_df(self, df):
 
         for _, row in df.iterrows():
 
             product_code = row['code']
             product = self.get_a_single_product_by_code(product_code)
 
-            regular_price = float(product['stock']['price'])
-            promo_price = float(row['promo_price'])
-            discount = regular_price - promo_price
-            date_from = pd.to_datetime(row['date_from'], format='%d-%m-%Y').strftime('%Y-%m-%d 00:00:00')
-            date_to = pd.to_datetime(row['date_to'], format='%d-%m-%Y').strftime('%Y-%m-%d 00:00:00')
+            if product:
+                try:
+                    regular_price = float(product['stock']['price'])
+                    promo_price = float(row['promo_price'])
+                    discount = regular_price - promo_price
+                    date_from = pd.to_datetime(row['date_from'], format='%d-%m-%Y').strftime('%Y-%m-%d 00:00:00')
+                    date_to = pd.to_datetime(row['date_to'], format='%d-%m-%Y').strftime('%Y-%m-%d 00:00:00')
 
-            special_offer = {
-                'discount': discount,
-                'date_from': date_from,
-                'date_to': date_to,
-                'product_id': product['product_id'],
-                'discount_type': 2
-            }
+                    special_offer = {
+                        'discount': discount,
+                        'date_from': date_from,
+                        'date_to': date_to,
+                        'product_id': product['product_id'],
+                        'discount_type': 2
+                    }
 
-            print(special_offer)
-
-            self.create_a_special_offer(special_offer)
-        
+                    response = self.create_a_special_offer(special_offer)
+                    if isinstance(response, dict):  # Successful response is a dict
+                        row['komunikat'] = 'Promocja dodana'
+                    else:  # Error response is text
+                        error_dict = json.loads(response)
+                        row['komunikat'] = error_dict['error_description']
+                except Exception as e:
+                    print(f'Error creating special offer: {str(e)}')
+                    row['komunikat'] = str(e)
+            else:
+                row['komunikat'] = f'Product {product_code} not found'
+                    
+        return df

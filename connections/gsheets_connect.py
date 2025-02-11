@@ -47,11 +47,8 @@ class GSheetsClient:
             
         df = pd.DataFrame(data[1:], columns=data[0])  # First row as header
         df.to_excel(os.path.join(SHEETS_DIR, 'google_sheets_all.xlsx'), index=False)
-
-        # Filter out rows where first column has None values
         df = df[df.iloc[:, 0].notna() & (df.iloc[:, 0] != '')]
-        # Filter out rows where 'uzupełnione' is True
-        df = df[df['uzupełnione'] != 'TRUE']
+        df = df[df['komunikat'] != 'Promocja dodana']
         
         if include_row_numbers:
             df.insert(0, 'Row Number', range(2, len(df) + 2)) # GSheets rows start at 2
@@ -87,3 +84,44 @@ class GSheetsClient:
         data = df_string.values.tolist()
         
         return [header] + data
+    
+    def batch_update_by_code(self, update_df):
+        """
+        Updates multiple rows in the worksheet by matching the 'code' column.
+        
+        Args:
+            update_df (pd.DataFrame): DataFrame containing updates with 'code' column
+        """
+        if update_df is None or update_df.empty:
+            print("No data provided for update")
+            return
+        
+        try:
+            current_data = self.get_data()
+            
+            # Create a dictionary mapping codes to row numbers (adding 2 because of header and 1-based indexing)
+            code_to_row = {str(code): idx + 2 for idx, code in enumerate(current_data['code'])}
+            
+            batch_updates = []
+            
+            for _, row in update_df.iterrows():
+                code = str(row['code'])
+                if code in code_to_row:
+                    row_num = code_to_row[code]
+                    
+                    batch_updates.append({
+                        'range': f'E{row_num}',
+                        'values': [[row['komunikat']]]
+                    })
+            
+            # Execute batch update if there are updates to make
+            if batch_updates:
+                self.worksheet.batch_update(batch_updates)
+                print(f"Successfully updated {len(batch_updates)} cells")
+            else:
+                print("No matching codes found to update")
+            
+        except Exception as e:
+            print(f"Error in batch update: {str(e)}")
+            raise
+    
