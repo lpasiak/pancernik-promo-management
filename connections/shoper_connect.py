@@ -11,7 +11,6 @@ class ShoperAPIClient:
         self.password = password
         self.session = requests.Session()
         self.token = None
-        self.sheets_dir = SHEETS_DIR
 
     def connect(self):
         """Authenticate with the API"""
@@ -59,12 +58,16 @@ class ShoperAPIClient:
             if not page_data:  # If no data is returned
                 break
 
+            # FOR TESTING
+            if page == 3:
+                break
+
             print(f'Page: {page}/{number_of_pages}')
             products.extend(page_data)
             page += 1
 
         df = pd.DataFrame(products)
-        df.to_excel(os.path.join(self.sheets_dir, 'shoper_all_products.xlsx'), index=False)
+        df.to_excel(os.path.join(SHEETS_DIR, 'shoper_all_products.xlsx'), index=False)
         return df
     
     def get_a_single_product(self, product_id):
@@ -123,7 +126,6 @@ class ShoperAPIClient:
         # Select only needed columns
         columns_to_keep = [
             'code',
-            'product_id',
             'product_name',
             'price',
             'promo_price',
@@ -134,8 +136,8 @@ class ShoperAPIClient:
         df = df[columns_to_keep]
         
         # Save to Excel
-        df.to_excel(os.path.join(self.sheets_dir, 'shoper_all_special_offers.xlsx'), index=False)
+        df.to_excel(os.path.join(SHEETS_DIR, 'shoper_all_special_offers.xlsx'), index=False)
         return df
     
-    def create_a_special_offer(self, product_id):
+    def create_a_special_offer(self, df):
         pass

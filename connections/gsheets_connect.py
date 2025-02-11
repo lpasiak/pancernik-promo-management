@@ -22,7 +22,6 @@ class GSheetsClient:
         self.gc = None
         self.sheet = None
         self.worksheet = None
-        self.sheets_dir = SHEETS_DIR
 
     def connect(self):
         """Authenticate with Google Sheets."""
@@ -47,7 +46,7 @@ class GSheetsClient:
             return pd.DataFrame()
             
         df = pd.DataFrame(data[1:], columns=data[0])  # First row as header
-        df.to_excel(os.path.join(self.sheets_dir, 'google_sheets_all.xlsx'), index=False)
+        df.to_excel(os.path.join(SHEETS_DIR, 'google_sheets_all.xlsx'), index=False)
         
         if include_row_numbers:
             df.insert(0, 'Row Number', range(2, len(df) + 2)) # GSheets rows start at 2
