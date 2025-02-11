@@ -101,6 +101,27 @@ class ShoperAPIClient:
             print(f'Error fetching product {product_code}: {str(e)}')
             return None
 
+    def create_a_special_offer(self, special_offer):
+
+        url = f'{self.site_url}/webapi/rest/specialoffers'
+
+        try:
+            response = self._handle_request('POST', url, json=special_offer)
+            if response.status_code != 200:
+                try:
+                    error_data = response.json()
+                    error_message = error_data.get('error_description', 'Brak opisu błędu.')
+                    print(f"X | Failed to create special offer. API response: {error_message}")
+                except json.JSONDecodeError:
+                    print(f"X | Failed to create special offer. Raw API Response: {response.text}")  
+                return None
+            else:
+                print(f'Special offer created successfully: {response.json()}')
+        except Exception as e:
+            print(f'Error creating special offer: {str(e)}')
+        
+        # return response.json()
+
     def get_all_products_and_select_special_offers(self):
         """Fetches all special offers and returns filtered DataFrame."""
         all_products = self.get_all_products()
@@ -139,5 +160,28 @@ class ShoperAPIClient:
         df.to_excel(os.path.join(SHEETS_DIR, 'shoper_all_special_offers.xlsx'), index=False)
         return df
     
-    def create_a_special_offer(self, df):
-        pass
+    def create_a_special_offer_from_df(self, df):
+
+        for _, row in df.iterrows():
+
+            product_code = row['code']
+            product = self.get_a_single_product_by_code(product_code)
+
+            regular_price = float(product['stock']['price'])
+            promo_price = float(row['promo_price'])
+            discount = regular_price - promo_price
+            date_from = pd.to_datetime(row['date_from'], format='%d-%m-%Y').strftime('%Y-%m-%d 00:00:00')
+            date_to = pd.to_datetime(row['date_to'], format='%d-%m-%Y').strftime('%Y-%m-%d 00:00:00')
+
+            special_offer = {
+                'discount': discount,
+                'date_from': date_from,
+                'date_to': date_to,
+                'product_id': product['product_id'],
+                'discount_type': 2
+            }
+
+            print(special_offer)
+
+            self.create_a_special_offer(special_offer)
+        

@@ -25,6 +25,7 @@ def main():
     )
 
     shoper_client.connect()
+    import_gsheets_client.connect()
     export_gsheets_client.connect()
 
     while True:
@@ -40,7 +41,8 @@ akcja: '''))
             export_gsheets_client.save_data(promo_offers_export_df)
         elif x == '2':
             promo_offers_to_import_df = pd.DataFrame(import_gsheets_client.get_data())
-            print(promo_offers_to_import_df)
+            shoper_client.create_a_special_offer_from_df(promo_offers_to_import_df)
+
         elif x == 'q':
             break
 

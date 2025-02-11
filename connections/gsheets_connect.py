@@ -47,6 +47,11 @@ class GSheetsClient:
             
         df = pd.DataFrame(data[1:], columns=data[0])  # First row as header
         df.to_excel(os.path.join(SHEETS_DIR, 'google_sheets_all.xlsx'), index=False)
+
+        # Filter out rows where first column has None values
+        df = df[df.iloc[:, 0].notna() & (df.iloc[:, 0] != '')]
+        # Filter out rows where 'uzupełnione' is True
+        df = df[df['uzupełnione'] != 'TRUE']
         
         if include_row_numbers:
             df.insert(0, 'Row Number', range(2, len(df) + 2)) # GSheets rows start at 2
