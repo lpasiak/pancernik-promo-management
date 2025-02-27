@@ -59,8 +59,8 @@ class ShoperAPIClient:
                 break
 
             # FOR TESTING
-            if page == 3:
-                break
+            # if page == 3:
+            #     break
 
             print(f'Page: {page}/{number_of_pages}')
             products.extend(page_data)
