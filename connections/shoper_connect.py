@@ -33,7 +33,6 @@ class ShoperAPIClient:
 
             if response.status_code == 429:  # Too Many Requests
                 retry_after = int(response.headers.get('Retry-After', 1))
-                print(f"Rate limit exceeded. Retrying after {retry_after} seconds...")
                 time.sleep(retry_after)
             else:
                 return response
