@@ -100,26 +100,6 @@ class ShoperAPIClient:
             print(f'Error fetching product {product_code}: {str(e)}')
             return None
 
-    def create_a_special_offer(self, special_offer):
-
-        url = f'{self.site_url}/webapi/rest/specialoffers'
-
-        try:
-            response = self._handle_request('POST', url, json=special_offer)
-            if response.status_code != 200:
-                try:
-                    error_data = response.json()
-                    error_message = error_data.get('error_description', 'Brak opisu błędu.')
-                    print(f"X | Failed to create a special offer special offer {special_offer['product_id']}. API response: {error_message}")
-                except json.JSONDecodeError:
-                    print(f"X | Failed to create a special offer {special_offer['product_id']}. Raw API Response: {response.text}")  
-                return response.text
-            else:
-                print(f'✓ Special offer for a product {special_offer['product_id']} created successfully.', end=' ')
-                return {'response': f'✓ Special offer for a product {special_offer['product_id']} created successfully.'}
-        except Exception as e:
-            print(f'Error creating special offer: {str(e)}')
-
     def get_all_products_and_select_special_offers(self):
         """Fetches all special offers and returns filtered DataFrame."""
         all_products = self.get_all_products()
@@ -195,36 +175,55 @@ class ShoperAPIClient:
                     
         return df
     
-    def remove_special_offer(self, special_offer_id):
-        url = f'{self.site_url}/webapi/rest/specialoffers/{special_offer_id}'
-
-        response = self._handle_request('DELETE', url)
-        is_special_offer_deleted = response.json()
+    def create_a_special_offer(self, special_offer):
+        url = f'{self.site_url}/webapi/rest/specialoffers'
+        response = self._handle_request('POST', url, json=special_offer)
 
         if response.status_code == 200:
-                print(f'✓ Special offer {special_offer_id} removed successfully.', end=' ')
+            print(f'✓ Special offer for the product_id: {special_offer['product_id']} created.')
+        return response.json()
+    
+    def remove_special_offer(self, special_offer_id):
+        url = f'{self.site_url}/webapi/rest/specialoffers/{special_offer_id}'
+        response = self._handle_request('DELETE', url)
+
+        if response.status_code == 200:
+            print(f'✓ Special offer {special_offer_id} removed successfully.')
         
-        return is_special_offer_deleted 
+        return response.json()
 
     def create_special_offers_percent_from_df(self, df):
-
+        """
+        Creates special offers from DataFrame with error handling.
+        Returns DataFrame with added 'komunikat' column containing status/error messages.
+        """
         print(f'{len(df)} products to be processed.')
         product_counter = 0
         
-        for _, row in df.iterrows():
+        # Create a copy of df to avoid modifying the original
+        result_df = df.copy()
+        result_df['komunikat'] = ''
+        
+        for idx, row in result_df.iterrows():
+            try:
+                product_code = row['code']
+                product = self.get_a_single_product_by_code(product_code)
 
-            product_code = row['code']
-            product = self.get_a_single_product_by_code(product_code)
-
-            if product:
+                if not product:
+                    result_df.at[idx, 'komunikat'] = f'Produkt {product_code} nie znaleziony'
+                    continue
 
                 try:
                     special_offer_id = product['special_offer']['promo_id']
-                    response = self.remove_special_offer(special_offer_id)
+                    self.remove_special_offer(special_offer_id)
+                except KeyError:
+                    # No existing special offer - that's fine
+                    pass
+                except Exception as e:
+                    result_df.at[idx, 'komunikat'] = f'Błąd przy usuwaniu promocji: {str(e)}'
+                    continue
 
-                except Exception:
-                    print(f'Error removing special offer from product {product['code']}')
-
+                # Try to create new special offer
                 try:
                     date_from = pd.to_datetime(row['date_from'], format='%d-%m-%Y').strftime('%Y-%m-%d 00:00:00')
                     date_to = pd.to_datetime(row['date_to'], format='%d-%m-%Y').strftime('%Y-%m-%d 00:00:00')
@@ -239,17 +238,23 @@ class ShoperAPIClient:
                     }
 
                     response = self.create_a_special_offer(special_offer)
-                    if isinstance(response, dict):  # Successful response is a dict
+                    if isinstance(response, int):
                         product_counter += 1
-                        print(f'{product_counter}/{len(df)}')
-                        row['komunikat'] = 'Promocja dodana'
-                    else:  # Error response is text
-                        error_dict = json.loads(response)
-                        row['komunikat'] = error_dict['error_description']
+                        print(f'Counter: {product_counter}/{len(df)}')
+                        result_df.at[idx, 'komunikat'] = f'Promocja dodana dla {row["code"]}. Nr promocji: {response}'
+                    else:
+                        error_dict = json.loads(response) if isinstance(response, str) else response
+                        result_df.at[idx, 'komunikat'] = f'Błąd API: {error_dict.get("error_description", "Nieznany błąd")}'
+                
+                except ValueError as e:
+                    result_df.at[idx, 'komunikat'] = f'Błąd formatu daty: {str(e)}'
+                except json.JSONDecodeError:
+                    result_df.at[idx, 'komunikat'] = f'Błąd odpowiedzi API: Nieprawidłowy format JSON'
                 except Exception as e:
-                    print(f'Error creating special offer: {str(e)}')
-                    row['komunikat'] = str(e)
-            else:
-                row['komunikat'] = f'Product {product_code} not found'
-                    
-        return df
+                    result_df.at[idx, 'komunikat'] = f'Błąd przy tworzeniu promocji: {str(e)}'
+
+            except Exception as e:
+                result_df.at[idx, 'komunikat'] = f'Nieoczekiwany błąd: {str(e)}'
+            
+        print(f'Zakończono. Utworzono {product_counter} promocji.')
+        return result_df

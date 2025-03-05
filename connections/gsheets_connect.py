@@ -48,7 +48,7 @@ class GSheetsClient:
         df = pd.DataFrame(data[1:], columns=data[0])  # First row as header
         df.to_excel(os.path.join(SHEETS_DIR, 'google_sheets_all.xlsx'), index=False)
         df = df[df.iloc[:, 0].notna() & (df.iloc[:, 0] != '')]
-        df = df[df['komunikat'] != 'Promocja dodana']
+        df = df[~df['komunikat'].str.contains('Promocja dodana', na=False)]
         
         if include_row_numbers:
             df.insert(0, 'Row Number', range(2, len(df) + 2)) # GSheets rows start at 2
@@ -97,10 +97,20 @@ class GSheetsClient:
             return
         
         try:
-            current_data = self.get_data()
+            # Get all data without filtering
+            worksheet_data = self.worksheet.get_all_values()
+            headers = worksheet_data[0]
             
-            # Create a dictionary mapping codes to row numbers (adding 2 because of header and 1-based indexing)
-            code_to_row = {str(code): idx + 2 for idx, code in enumerate(current_data['code'])}
+            # Find column indices
+            try:
+                code_col_idx = headers.index('code') + 1  # 1-based column indexing
+                komunikat_col_idx = headers.index('komunikat') + 1
+            except ValueError:
+                raise ValueError("Required columns 'code' or 'komunikat' not found in worksheet")
+            
+            # Create code to row mapping (2-based row indexing for header)
+            code_to_row = {str(row[code_col_idx-1]): idx + 2 
+                          for idx, row in enumerate(worksheet_data[1:])}
             
             batch_updates = []
             
@@ -108,13 +118,13 @@ class GSheetsClient:
                 code = str(row['code'])
                 if code in code_to_row:
                     row_num = code_to_row[code]
+                    col_letter = chr(64 + komunikat_col_idx)  # Convert column number to letter
                     
                     batch_updates.append({
-                        'range': f'E{row_num}',
+                        'range': f'{col_letter}{row_num}',
                         'values': [[row['komunikat']]]
                     })
             
-            # Execute batch update if there are updates to make
             if batch_updates:
                 self.worksheet.batch_update(batch_updates)
                 print(f"Successfully updated {len(batch_updates)} cells")
