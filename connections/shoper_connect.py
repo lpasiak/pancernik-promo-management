@@ -209,11 +209,12 @@ class ShoperAPIClient:
     def create_special_offers_percent_from_df(self, df):
 
         print(f'{len(df)} products to be processed.')
+        product_counter = 0
+        
         for _, row in df.iterrows():
 
             product_code = row['code']
             product = self.get_a_single_product_by_code(product_code)
-            product_counter = 0
 
             if product:
 
