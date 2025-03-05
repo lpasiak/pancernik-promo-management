@@ -116,7 +116,7 @@ class ShoperAPIClient:
                     print(f"X | Failed to create a special offer {special_offer['product_id']}. Raw API Response: {response.text}")  
                 return response.text
             else:
-                print(f'✓ Special offer for a product {special_offer['product_id']} created successfully.')
+                print(f'✓ Special offer for a product {special_offer['product_id']} created successfully.', end=' ')
                 return {'response': f'✓ Special offer for a product {special_offer['product_id']} created successfully.'}
         except Exception as e:
             print(f'Error creating special offer: {str(e)}')
@@ -184,6 +184,64 @@ class ShoperAPIClient:
 
                     response = self.create_a_special_offer(special_offer)
                     if isinstance(response, dict):  # Successful response is a dict
+                        row['komunikat'] = 'Promocja dodana'
+                    else:  # Error response is text
+                        error_dict = json.loads(response)
+                        row['komunikat'] = error_dict['error_description']
+                except Exception as e:
+                    print(f'Error creating special offer: {str(e)}')
+                    row['komunikat'] = str(e)
+            else:
+                row['komunikat'] = f'Product {product_code} not found'
+                    
+        return df
+    
+    def remove_special_offer(self, special_offer_id):
+        url = f'{self.site_url}/webapi/rest/specialoffers/{special_offer_id}'
+
+        response = self._handle_request('DELETE', url)
+        is_special_offer_deleted = response.json()
+
+        if response.status_code == 200:
+                print(f'✓ Special offer {special_offer_id} removed successfully.', end=' ')
+        
+        return is_special_offer_deleted 
+
+    def create_special_offers_percent_from_df(self, df):
+
+        print(f'{len(df)} products to be processed.')
+        for _, row in df.iterrows():
+
+            product_code = row['code']
+            product = self.get_a_single_product_by_code(product_code)
+            product_counter = 0
+
+            if product:
+
+                try:
+                    special_offer_id = product['special_offer']['promo_id']
+                    response = self.remove_special_offer(special_offer_id)
+
+                except Exception:
+                    print(f'Error removing special offer from product {product['code']}')
+
+                try:
+                    date_from = pd.to_datetime(row['date_from'], format='%d-%m-%Y').strftime('%Y-%m-%d 00:00:00')
+                    date_to = pd.to_datetime(row['date_to'], format='%d-%m-%Y').strftime('%Y-%m-%d 00:00:00')
+                    discount_percent = row['discount_percent']
+
+                    special_offer = {
+                        'discount': discount_percent,
+                        'date_from': date_from,
+                        'date_to': date_to,
+                        'product_id': product['product_id'],
+                        'discount_type': 3
+                    }
+
+                    response = self.create_a_special_offer(special_offer)
+                    if isinstance(response, dict):  # Successful response is a dict
+                        product_counter += 1
+                        print(f'{product_counter}/{len(df)}')
                         row['komunikat'] = 'Promocja dodana'
                     else:  # Error response is text
                         error_dict = json.loads(response)

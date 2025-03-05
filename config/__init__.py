@@ -9,6 +9,7 @@ from .config import (
     CREDENTIALS_FILE,
     SHEET_EXPORT_NAME,
     SHEET_IMPORT_NAME,
+    SHEET_IMPORT_NAME_PERCENT,
     SHEET_ID,
     init_directories
 )

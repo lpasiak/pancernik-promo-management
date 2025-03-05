@@ -9,7 +9,8 @@ SHOPER_LIMIT = 50
 
 # Google Sheets
 SHEET_EXPORT_NAME = 'Eksport'
-SHEET_IMPORT_NAME = 'Do importu'
+SHEET_IMPORT_NAME_PERCENT = 'Do importu procenty'
+SHEET_IMPORT_NAME = 'Do importu stałe'
 CREDENTIALS_FILE = os.path.join('credentials', 'gsheets_credentials.json')
 SHEET_ID = os.getenv('SHEET_ID')
 
